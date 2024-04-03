@@ -10,7 +10,7 @@ from components.tflitemodel import ObjectDetectionTfLiteModel
 from enum import Enum
 
 
-class ObjectDetectionModel(Enum):
+class ObjectDetectionModelSelector(Enum):
 
     def __new__(cls, *args, **kwargs):
         value = len(cls.__members__) + 1
@@ -57,6 +57,7 @@ def main(_model):
 
     frame_counter = 0
     start = time.time()
+    title = 'Frame'
     while True:
         frame_counter += 1
         # Capture the video frame by frame
@@ -71,12 +72,12 @@ def main(_model):
         _model.add_boxes_to_cv2_frame(cv2, frame, image_width, image_height)
 
         if time.time() - start >= 1:
-            print('fps:', frame_counter)
+            print('Running at ca. {} Hz'.format(frame_counter))
             frame_counter = 0
             start = time.time()
 
         # Display the resulting frame
-        cv2.imshow('frame', frame)
+        cv2.imshow(title, frame)
 
         # the 'q' button to quit
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -89,8 +90,9 @@ def main(_model):
 
 
 if __name__ == '__main__':
-    # select = ObjectDetectionModel.SSD_MOBILENET_V1_COCO_QUANT_POSTPROCESS
-    select = ObjectDetectionModel.SSD_MOBILENET_V2_COCO_QUANT_POSTPROCESS
+    # select = ObjectDetectionModelSelector.SSD_MOBILENET_V1_COCO_QUANT_POSTPROCESS
+    select = ObjectDetectionModelSelector.SSD_MOBILENET_V2_COCO_QUANT_POSTPROCESS
     print('Selected Model: {}'.format(select.name))
     model = ObjectDetectionTfLiteModel(name=select.name, link=select.link, label_link=select.label_link)
+    # model.show_labels(True)
     main(model)

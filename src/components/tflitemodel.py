@@ -100,3 +100,15 @@ class ObjectDetectionTfLiteModel(TfLiteModel):
                         label,
                         (x_min, label_y_min - 7),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+
+    def show_labels(self, cmd_output: bool = True):
+        info = list()
+        info.append('LABELS from {}'.format(self.label_link))
+        [info.append('  {:>3}: {}'.format(index, self.labels[index])) for index in self.labels]
+        info.append('')
+
+        if cmd_output:
+            for line in info:
+                print(line)
+        else:
+            return info
