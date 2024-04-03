@@ -8,6 +8,9 @@ class TfLiteModel:
     name: str
     link: str
 
+    def __post_init__(self):
+        print('Selected Model: {}'.format(self.name))
+
     @property
     def interpreter(self) -> Interpreter or None:
         if os.path.exists(self.link):
