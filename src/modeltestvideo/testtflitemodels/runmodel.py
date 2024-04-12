@@ -2,7 +2,7 @@ import os
 import cv2
 import time
 import numpy as np
-from modeltestvideo.testtflitemodels.googlecoraledgetpu.objectdetection.modelselection import GoogleCoralEdgeTpuModelSelector
+from modeltestvideo.testtflitemodels.coraledgetpu.objectdetection.modelselection import GoogleCoralEdgeTpuModelSelector
 from components.tflitemodel import ObjectDetectionTfLiteModel
 
 
@@ -53,6 +53,7 @@ def main(_model):
 
 # RUN =================================================================================================================
 def run_object_detection():
+    # SELECT MODEL
     select = GoogleCoralEdgeTpuModelSelector.SSD_MOBILENET_V2_COCO_QUANT_POSTPROCESS
     # select.show(True)
 
