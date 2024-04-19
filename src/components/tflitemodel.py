@@ -1,15 +1,63 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import List
 from tensorflow.lite.python.interpreter import Interpreter
+import numpy
+import time
+
+
+@dataclass()
+class TfLiteModelInOutputDetails:
+    pos: int
+    location: str
+    name: str
+    index: int
+    shape: numpy.array
+    shape_signature: any
+    dtype: str
+    quantization: tuple
+    quantization_parameters: dict
+    sparsity_parameters: dict
+
+    @classmethod
+    def from_dict(cls, pos: int, location: str,details: dict):
+        return cls(
+            pos=pos,
+            location=location,
+            name=details['name'],
+            index=details['index'],
+            shape=details['shape'],
+            shape_signature=details['shape_signature'],
+            dtype=details['dtype'],
+            quantization=details['quantization'],
+            quantization_parameters=details['quantization_parameters'],
+            sparsity_parameters=details['sparsity_parameters'],
+        )
+
+    def show(self, cmd_output: bool = False):
+        print_string = '{:25}: {}'
+        info = list()
+        info.append(print_string.format('Pos', self.pos))
+        info.append(print_string.format('Location', self.location))
+        info.append(print_string.format('Index', self.index))
+        info.append(print_string.format('Name', self.name))
+        info.append(print_string.format('Shape', self.shape))
+        info.append(print_string.format('Shape Signature', self.shape_signature))
+        info.append(print_string.format('dtype', self.dtype))
+        info.append(print_string.format('Quantization', self.quantization))
+        info.append(print_string.format('Quantization Parameters', self.quantization_parameters))
+        info.append(print_string.format('Sparsity Parameters', self.sparsity_parameters))
+        if cmd_output:
+            for line in info:
+                print(line)
+        else:
+            return info
 
 
 @dataclass()
 class TfLiteModel:
     name: str
     link: str
-
-    def __post_init__(self):
-        print('Selected Model: {}'.format(self.name))
 
     @property
     def interpreter(self) -> Interpreter or None:
@@ -20,94 +68,152 @@ class TfLiteModel:
         else:
             return None
 
+    def set_inputs(self, data):
+        if self.interpreter is not None:
+            for ind in self.input_details:
+                self.interpreter.set_tensor(ind.index, data)
+
     def invoke(self):
         self.interpreter.invoke() if self.interpreter is not None else None
 
-
-@dataclass()
-class ObjectDetectionTfLiteModel(TfLiteModel):
-    label_link: str or None
+    def get_outputs(self) -> list:
+        data = list()
+        if self.interpreter is not None:
+            for ond in self.output_details:
+                out = self.interpreter.get_tensor(ond.index)[0]
+                data.append(out)
+        return data
 
     @property
-    def labels(self) -> dict or None:
-        encoding = 'utf-8'
-        with open(self.label_link, 'r', encoding=encoding) as f:
-            lines = f.readlines()
-            if not lines:
-                return {}
-            if lines[0].split(' ', maxsplit=1)[0].isdigit():
-                pairs = [line.split(' ', maxsplit=1) for line in lines]
-                return {int(index): label.strip() for index, label in pairs}
+    def expected_inference_time(self) -> float:
+        return self.dummy_run()
+
+    def dummy_run(self) -> float:
+        self.set_inputs(self.dummy_input_data)
+        samples = []
+        for loop in range(10):
+            start = time.time()
+            self.invoke()
+            samples.append(time.time() - start)
+        return numpy.average(samples) if samples else 0.0
+
+    @property
+    def input_details(self) -> List[TfLiteModelInOutputDetails]:
+        details = list()
+        if self.interpreter is not None:
+            for ind, entry in enumerate(self.interpreter.get_input_details()):
+                ip = TfLiteModelInOutputDetails.from_dict(pos=ind, location='Input', details=entry)
+                details.append(ip)
+        return details
+
+    @property
+    def dummy_input_data(self) -> list:
+        input_data = list()
+        for ind in self.input_details:
+            size = ind.shape[1:]
+            if numpy.issubdtype(ind.dtype, numpy.integer):
+                dummy = numpy.random.random_integers(255, size=size)
             else:
-                return {index: line.strip() for index, line in enumerate(lines)}
+                dummy = numpy.random.random_sample(size)
+            input_data.append(dummy.astype(ind.dtype.__name__))
+        return input_data
 
     @property
-    def width(self) -> int:
-        _width = -1
+    def output_details(self) -> List[TfLiteModelInOutputDetails]:
+        details = list()
         if self.interpreter is not None:
-            input_details = self.interpreter.get_input_details()
-            # output_details = interpreter.get_output_details()
-            _width = input_details[0]['shape'][2]
-        return _width
+            for ond, entry in enumerate(self.interpreter.get_output_details()):
+                op = TfLiteModelInOutputDetails.from_dict(pos=ond, location='Output', details=entry)
+                details.append(op)
+        return details
 
-    @property
-    def height(self) -> int:
-        _height = -1
-        if self.interpreter is not None:
-            input_details = self.interpreter.get_input_details()
-            _height = input_details[0]['shape'][1]
-        return _height
+    def get_dummy_inputs(self) -> list:
+        input_data = list()
+        for ip in self.input_details:
+            dummy = []
+            input_data.append(dummy)
 
-    def set_input(self, data):
-        if self.interpreter is not None:
-            input_details = self.interpreter.get_input_details()
-            self.interpreter.set_tensor(input_details[0]['index'], data)
+        return input_data
 
-    def get_outputs(self) -> (list or None, list or None, list or None):
-        if self.interpreter is not None:
-            output_details = self.interpreter.get_output_details()
-            _boxes = self.interpreter.get_tensor(output_details[0]['index'])[0]
-            _classes = self.interpreter.get_tensor(output_details[1]['index'])[0]
-            _scores = self.interpreter.get_tensor(output_details[2]['index'])[0]
-            return _boxes, _classes, _scores
-        else:
-            return None, None, None
-
-    def add_boxes_to_cv2_frame(self, cv2, frame, image_width, image_height):
-        boxes, classes, scores = self.get_outputs()
-        for i in range(len(scores)):
-            if 0.5 < scores[i] <= 1.0:
-                # Interpreter can return coordinates that are outside of image dimensions,
-                # need to force them to be within image using max() and min()
-                y_min = int(max(1, (boxes[i][0] * image_height)))
-                x_min = int(max(1, (boxes[i][1] * image_width)))
-                y_max = int(min(image_height, (boxes[i][2] * image_height)))
-                x_max = int(min(image_width, (boxes[i][3] * image_width)))
-                cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (10, 255, 0), 4)
-
-                # Draw label
-                if self.labels is not None:
-                    object_name = self.labels[int(classes[i])]
-                    label = '%s: %d%%' % (object_name, int(scores[i] * 100))
-
-                    label_size, base_line = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
-
-                    # Make sure not to draw label too close to top of window
-                    label_y_min = max(y_min, label_size[1] + 10)
-                    cv2.rectangle(
-                        frame,
-                        (x_min, label_y_min - label_size[1] - 10),
-                        (x_min + label_size[0], label_y_min + base_line - 10), (255, 255, 255), cv2.FILLED)
-                    cv2.putText(
-                        frame,
-                        label,
-                        (x_min, label_y_min - 7),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
-
-    def show_labels(self, cmd_output: bool = True):
+    def show_input_details(self, cmd_output: bool = True):
         info = list()
-        info.append('LABELS from {}'.format(self.label_link))
-        [info.append('  {:>3}: {}'.format(index, self.labels[index])) for index in self.labels]
+        info.append('INPUT DETAILS:')
+        if self.interpreter is None:
+            info.append('  Interpreter not available.')
+        else:
+            for ip in self.input_details:
+                info.append(f'  Input {ip.pos}:')
+                info += [f'    {row}' for row in ip.show(False)]
+                info.append('')
+
+        if cmd_output:
+            for line in info:
+                print(line)
+        else:
+            return info
+
+    def show_dummy_input_data(self, cmd_output: bool = True):
+        print_string = '    {:25}: {}'
+        info = list()
+        info.append('DUMMY INPUT DATA:')
+        for i, di in enumerate(self.dummy_input_data):
+            info.append(f'  Input {i}:')
+            info.append(print_string.format('Shape', di.shape))
+            info.append(print_string.format('dType', di.dtype))
+        info.append('')
+
+        if cmd_output:
+            for line in info:
+                print(line)
+        else:
+            return info
+
+    def show_output_details(self, cmd_output: bool = True):
+        info = list()
+
+        info.append('OUTPUT DETAILS:')
+        if self.interpreter is None:
+            info.append('  Interpreter not available.')
+        else:
+            for op in self.output_details:
+                info.append(f'  Output {op.pos}:')
+                info += [f'    {row}' for row in op.show(False)]
+                info.append('')
+
+        if cmd_output:
+            for line in info:
+                print(line)
+        else:
+            return info
+
+    def show_outputs(self, cmd_output: bool = True):
+        print_string = '    {:25}: {}'
+        info = list()
+        info.append('OUTPUT DATA:')
+        for i, do in enumerate(self.get_outputs()):
+            info.append(f'  Output {i}:')
+            info.append(print_string.format('Shape', do.shape))
+            info.append(print_string.format('dType', do.dtype))
+        info.append('')
+
+        if cmd_output:
+            for line in info:
+                print(line)
+        else:
+            return info
+
+    def show(self, cmd_output: bool = True):
+        print_string = '{:29}: {}'
+        info = list()
+        info.append(print_string.format('Name', self.name))
+        info.append(print_string.format('Link', self.link))
+        info.append(print_string.format('Expected Inference Time', self.expected_inference_time))
+        info.append('')
+        info += self.show_input_details(False)
+        info += self.show_dummy_input_data(False)
+        info.append('')
+        info += self.show_output_details(False)
+        info += self.show_outputs(False)
         info.append('')
 
         if cmd_output:

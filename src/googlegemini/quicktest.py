@@ -47,11 +47,11 @@ def ask_audi_manual(user_prompt: str):
 
 if __name__ == '__main__':
     # get_models()
-    # generate_list("Names for a CARIAD Infotainment systems pyton package. Single words only")
+    generate_list("Names for a CARIAD Infotainment systems pyton package. Single words only")
     # ask_audi_manual('What do indicator lights in the instrument cluster do?')
     # ask_audi_manual('What unit is the engine speed shown in?')
     # ask_audi_manual('How many words does the provided text contain?')
-    ask_audi_manual('What topics does the provided text contain? Provide a bulleted list.')
+    # ask_audi_manual('What topics does the provided text contain? Provide a bulleted list.')
 
 
 

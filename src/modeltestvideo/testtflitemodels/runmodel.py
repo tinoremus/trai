@@ -2,7 +2,7 @@ import os
 import cv2
 import time
 import numpy as np
-from modeltestvideo.testtflitemodels.coraledgetpu.objectdetection.modelselection import GoogleCoralEdgeTpuModelSelector
+from computervision.objectdetection.models.coraledgetpu.modelselection import GoogleCoralEdgeTpuModelSelector
 from components.tflitemodel import ObjectDetectionTfLiteModel
 
 
@@ -27,7 +27,7 @@ def main(_model):
         frame_resized = cv2.resize(frame_rgb, (_model.width, _model.height))
         input_data = np.expand_dims(frame_resized, axis=0)
         # set frame as input tensors
-        _model.set_input(input_data)
+        _model.set_inputs(input_data)
         _model.invoke()
 
         # Object Detection Frame

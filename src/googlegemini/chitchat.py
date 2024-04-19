@@ -10,10 +10,12 @@ model = genai.GenerativeModel('gemini-pro')
 
 def generate_text(query: str, history):
     response = model.generate_content(query, stream=True)
-    ic(history)
-    for chunk in response:
-        markdown.markdown(chunk.text)
-        yield chunk.text
+    ic(response)
+    response
+    # for chunk in response:
+    #     print(chunk.text)
+    #     markdown.markdown(chunk.text)
+    #     yield chunk.text
 
 
 gr.ChatInterface(
