@@ -70,31 +70,25 @@ class TfLiteModel:
 
     def set_inputs(self, data):
         if self.interpreter is not None:
-            for ind in self.input_details:
-                self.interpreter.set_tensor(ind.index, data)
+            for ii, ind in enumerate(self.input_details):
+                self.interpreter.set_tensor(ind.index, data[ii])
 
     def invoke(self):
         self.interpreter.invoke() if self.interpreter is not None else None
 
-    def get_outputs(self) -> list:
-        data = list()
-        if self.interpreter is not None:
-            for ond in self.output_details:
-                out = self.interpreter.get_tensor(ond.index)[0]
-                data.append(out)
-        return data
-
     @property
     def expected_inference_time(self) -> float:
-        return self.dummy_run()
+        return self.dummy_run() if self.interpreter is not None else 0
 
-    def dummy_run(self) -> float:
+    def dummy_run(self, loops: int = 10) -> float:
         self.set_inputs(self.dummy_input_data)
         samples = []
-        for loop in range(10):
+        for loop in range(loops):
             start = time.time()
             self.invoke()
-            samples.append(time.time() - start)
+            run_time = time.time() - start
+            yield run_time
+            samples.append(run_time)
         return numpy.average(samples) if samples else 0.0
 
     @property
@@ -110,7 +104,7 @@ class TfLiteModel:
     def dummy_input_data(self) -> list:
         input_data = list()
         for ind in self.input_details:
-            size = ind.shape[1:]
+            size = [v if v is not None else 1 for v in ind.shape]
             if numpy.issubdtype(ind.dtype, numpy.integer):
                 dummy = numpy.random.random_integers(255, size=size)
             else:
@@ -127,13 +121,14 @@ class TfLiteModel:
                 details.append(op)
         return details
 
-    def get_dummy_inputs(self) -> list:
-        input_data = list()
-        for ip in self.input_details:
-            dummy = []
-            input_data.append(dummy)
-
-        return input_data
+    @property
+    def dummy_output_data(self) -> list:
+        self.set_inputs(self.dummy_input_data)
+        self.invoke()
+        data = list()
+        for ond in self.output_details:
+            data.append(self.interpreter.get_tensor(ond.index))
+        return data
 
     def show_input_details(self, cmd_output: bool = True):
         info = list()
@@ -190,8 +185,8 @@ class TfLiteModel:
         print_string = '    {:25}: {}'
         info = list()
         info.append('OUTPUT DATA:')
-        for i, do in enumerate(self.get_outputs()):
-            info.append(f'  Output {i}:')
+        for do in self.output_details:
+            info.append(f'  Output {do.index}:')
             info.append(print_string.format('Shape', do.shape))
             info.append(print_string.format('dType', do.dtype))
         info.append('')
@@ -202,12 +197,13 @@ class TfLiteModel:
         else:
             return info
 
-    def show(self, cmd_output: bool = True):
+    @property
+    def tflite_model_info(self) -> list:
         print_string = '{:29}: {}'
         info = list()
         info.append(print_string.format('Name', self.name))
         info.append(print_string.format('Link', self.link))
-        info.append(print_string.format('Expected Inference Time', self.expected_inference_time))
+        # info.append(print_string.format('Expected Inference Time', self.expected_inference_time))
         info.append('')
         info += self.show_input_details(False)
         info += self.show_dummy_input_data(False)
@@ -215,9 +211,20 @@ class TfLiteModel:
         info += self.show_output_details(False)
         info += self.show_outputs(False)
         info.append('')
+        return info
 
+    def show(self, cmd_output: bool = True):
+
+        info = self.tflite_model_info
         if cmd_output:
             for line in info:
                 print(line)
         else:
             return info
+
+
+if __name__ == '__main__':
+    path_name = r'/Volumes/Macintosh HD/Users/tremus/Documents/repos/github/trai/src/modeltestvideo/testtflitemodels/googlemediapipe/audioclassifier/'
+    file_name = 'yamnet_float32.tflite'
+    mi = TfLiteModel(name=file_name, link=os.path.join(path_name, file_name))
+    mi.show(True)

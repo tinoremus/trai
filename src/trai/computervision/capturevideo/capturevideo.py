@@ -2,19 +2,23 @@ from dataclasses import dataclass
 import datetime
 import numpy
 import cv2
+import time
 
 
 @dataclass()
 class FrameProcessor:
     def process_frame(self, frame) -> numpy.ndarray:
+        # dummy implementation
         return frame
 
 
 @dataclass()
 class VideoCapture:
     source: int
+    title: str = 'frame'
     exit_key: str = 'q'
     frame_counter: int = 0
+    fps: int = 0
     _cap: cv2.VideoCapture or None = None
     show_info: bool = False
     info_type: str = 'frame_counter'
@@ -27,6 +31,7 @@ class VideoCapture:
             if self.info_type in [
                 'frame_counter',
                 'date_time',
+                'fps',
         ] else 'frame_counter'
         self.info_location = (
             self.info_location) if self.info_location in [
@@ -85,15 +90,23 @@ class VideoCapture:
     def run(self):
         if self._cap is None:
             return
+        start = time.time()
+        fps_counter = 0
         while True:
+            fps_counter += 1
             self.frame_counter += 1
             # capture frame
             ret, frame = self._cap.read()
+            # get FPS
+            if time.time() - start >= 1:
+                self.fps = fps_counter
+                fps_counter = 0
+                start = time.time()
             # process frame
             frame = self.add_info(frame) if self.show_info else frame
             frame = self.frame_processor.process_frame(frame)
             # show frame
-            cv2.imshow('frame', frame)
+            cv2.imshow(self.title, frame)
             # press "q" to end video capture
             if cv2.waitKey(1) & 0xFF == ord(self.exit_key):
                 break
@@ -106,6 +119,8 @@ class VideoCapture:
             label = 'FRAME={}'.format(self.frame_counter)
         elif self.info_type == 'date_time':
             label = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S:%f')
+        elif self.info_type == 'fps':
+            label = '{:3d} FPS'.format(self.fps)
         else:
             return frame
 
@@ -161,7 +176,7 @@ def capture_video_obj():
     cap = VideoCapture(
         source=0,
         show_info=True,
-        info_type='date_time',
+        info_type='fps',
         info_location='lb'
     )
     cap.show(True)
