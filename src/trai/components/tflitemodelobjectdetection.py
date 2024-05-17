@@ -86,6 +86,8 @@ class ObjectDetectionTfLiteModel(TfLiteModel):
     classes: list = field(default_factory=list)
     scores: list = field(default_factory=list)
 
+    confidence_threshold: float = 0.7
+
     def load_labels(self):
         if not os.path.exists(self.label_file_path):
             self.labels = {}
@@ -136,7 +138,7 @@ class ObjectDetectionTfLiteModel(TfLiteModel):
 
     def get_boxes(self, frame: np.array) -> List[ObjectBox]:
         self.fetch_outputs()
-        ret = [(s, b, c) for s, b, c in zip(self.scores, self.boxes, self.classes) if 1 >= s > 0.5]
+        ret = [(s, b, c) for s, b, c in zip(self.scores, self.boxes, self.classes) if 1 >= s > self.confidence_threshold]
         return [
             ObjectBox(
                 img_width=frame.shape[1],
@@ -158,7 +160,6 @@ class ObjectDetectionTfLiteModel(TfLiteModel):
         return label
 
     def add_boxes_to_frame(self, frame: np.array):
-
         [self.__cv2_boxes__(frame, box) for box in self.get_boxes(frame)]
 
     @staticmethod

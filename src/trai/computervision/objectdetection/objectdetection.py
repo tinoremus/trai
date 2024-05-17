@@ -15,10 +15,12 @@ from PIL import Image
 @dataclass()
 class ObjectDetectionFrameCV2Processor(FrameProcessor):
     model: ObjectDetectionTfLiteModel or None
+    confidence_threshold: float = 0.7
 
     def process_frame(self, frame: np.array) -> np.array:
         if self.model is None:
             return frame
+        self.model.confidence_threshold = self.confidence_threshold
         # switch order from BGR to RGB
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         # resize image to fit model inputs
@@ -57,7 +59,7 @@ def capture_video_objectdetection():
 
 
 def single_image_processing():
-    model = SSDMobileNetV1CocoQuantPostProcess()
+    model = SSDMobileNetV2CocoQuantPostProcess()
     # model.show(True)
     frame_processor = ObjectDetectionFrameCV2Processor(model=model)
 
