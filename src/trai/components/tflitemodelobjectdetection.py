@@ -157,22 +157,24 @@ class ObjectDetectionTfLiteModel(TfLiteModel):
             print(err)
         return label
 
-    def add_boxes_to_cv2_frame(self, frame: np.array):
+    def add_boxes_to_frame(self, frame: np.array):
+
+        [self.__cv2_boxes__(frame, box) for box in self.get_boxes(frame)]
+
+    @staticmethod
+    def __cv2_boxes__(frame: np.array, box: ObjectBox):
         object_frame_color = (10, 255, 0)
         label_frame_fill_color = (255, 255, 255)
         label_text_color = (0, 0, 0)
-        # [cv2.rectangle(frame, (box.x_min, box.y_min), (box.x_max, box.y_max), color, 4)
-        #  for box in self.get_boxes(frame)]
 
-        for box in self.get_boxes(frame):
-            cv2.rectangle(frame, (box.x_min, box.y_min), (box.x_max, box.y_max), object_frame_color, 4)
-            if box.object_name is not None:
-                cv2.rectangle(frame,
-                              (box.x_min, box.label_y_min + 10),
-                              (box.x_min + box.label_width, box.label_y_min + box.base_line - 30),
-                              label_frame_fill_color, cv2.FILLED)
-                cv2.putText(frame, box.label,(box.x_min, box.label_y_min),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, label_text_color, 2)
+        cv2.rectangle(frame, (box.x_min, box.y_min), (box.x_max, box.y_max), object_frame_color, 4)
+        if box.object_name is not None:
+            cv2.rectangle(frame,
+                          (box.x_min, box.label_y_min + 10),
+                          (box.x_min + box.label_width, box.label_y_min + box.base_line - 30),
+                          label_frame_fill_color, cv2.FILLED)
+            cv2.putText(frame, box.label, (box.x_min, box.label_y_min),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, label_text_color, 2)
 
     @property
     def tflite_model_object_detection_info(self) -> list:
