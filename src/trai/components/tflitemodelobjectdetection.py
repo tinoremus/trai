@@ -174,51 +174,6 @@ class ObjectDetectionTfLiteModel(TfLiteModel):
                 cv2.putText(frame, box.label,(box.x_min, box.label_y_min),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, label_text_color, 2)
 
-    def get_outputs(self) -> (list or None, list or None, list or None):
-        if self.interpreter is not None:
-            output_details = self.interpreter.get_output_details()
-            _boxes = self.interpreter.get_tensor(output_details[0]['index'])[0]
-            _classes = self.interpreter.get_tensor(output_details[1]['index'])[0]
-            _scores = self.interpreter.get_tensor(output_details[2]['index'])[0]
-            return _boxes, _classes, _scores
-        else:
-            return None, None, None
-
-    def legacy(self, frame, image_width, image_height):
-        boxes, classes, scores = self.get_outputs()
-        object_found = False
-        for i in range(len(scores)):
-            if 0.5 < scores[i] <= 1.0:
-                # Interpreter can return coordinates that are outside of image dimensions,
-                # need to force them to be within image using max() and min()
-                y_min = int(max(1, (boxes[i][0] * image_height)))
-                x_min = int(max(1, (boxes[i][1] * image_width)))
-                y_max = int(min(image_height, (boxes[i][2] * image_height)))
-                x_max = int(min(image_width, (boxes[i][3] * image_width)))
-                cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (10, 255, 0), 4)
-
-                # Draw label
-                if self.labels is not None:
-                    object_name = self.labels[int(classes[i])]
-                    label = '%s: %d%%' % (object_name, int(scores[i] * 100))
-                    print(label)
-                    label_size, base_line = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
-
-                    # Make sure not to draw label too close to top of window
-                    label_y_min = max(y_min, label_size[1] + 10)
-                    cv2.rectangle(
-                        frame,
-                        (x_min, label_y_min - label_size[1] - 10),
-                        (x_min + label_size[0], label_y_min + base_line - 10), (255, 255, 255), cv2.FILLED)
-                    cv2.putText(
-                        frame,
-                        label,
-                        (x_min, label_y_min - 7),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
-
-        if not object_found:
-            print('No Object detected. Best score was: {}'.format(max(scores)))
-
     @property
     def tflite_model_object_detection_info(self) -> list:
         print_string = '  {:27}: {}'
